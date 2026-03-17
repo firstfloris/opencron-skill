@@ -46,19 +46,18 @@ Keeps `cron-data.json` in sync with `jobs.json` every 30 seconds.
 
 ### 3. Open the dashboard
 
-The dashboard is served via the nginx proxy on port `${CANVAS_PORT:-8090}`. Get the public IP:
+Detect your setup and build the dashboard URL:
 
 ```bash
 HOST_IP=$(curl -s ifconfig.me)
+if curl -sf "http://127.0.0.1:${CANVAS_PORT:-8090}/cron.html?token=${OPENCLAW_GATEWAY_TOKEN}" > /dev/null 2>&1; then
+  # Nginx proxy is running — use short path
+  DASHBOARD_URL="http://${HOST_IP}:${CANVAS_PORT:-8090}/cron.html?token=${OPENCLAW_GATEWAY_TOKEN}"
+else
+  # No proxy — use gateway canvas path directly
+  DASHBOARD_URL="http://${HOST_IP}:${OPENCLAW_GATEWAY_PORT:-18789}/__openclaw__/canvas/cron.html?token=${OPENCLAW_GATEWAY_TOKEN}"
+fi
 ```
-
-Dashboard URL:
-
-```
-http://${HOST_IP}:${CANVAS_PORT:-8090}/cron.html?token=${OPENCLAW_GATEWAY_TOKEN}
-```
-
-**Important:** The gateway port (18789) requires Bearer auth and cannot be used as a browser URL. Always use the nginx proxy port.
 
 ## Scripts
 
@@ -69,9 +68,9 @@ http://${HOST_IP}:${CANVAS_PORT:-8090}/cron.html?token=${OPENCLAW_GATEWAY_TOKEN}
 | `generate.py` | Generate standalone HTML with embedded data | `python3 skills/opencron/generate.py -o dashboard.html` |
 | `serve.py` | Run a local HTTP server for the dashboard | `python3 skills/opencron/serve.py --port 8787` |
 
-## Serving Externally (Optional)
+## Nginx Proxy (Optional)
 
-To access the dashboard from outside Docker, add an nginx reverse proxy. See `nginx-canvas.conf.template` for a production-ready config with:
+If you run OpenClaw in Docker and want cleaner URLs + rate limiting, add an nginx reverse proxy. See `nginx-canvas.conf.template` for a production-ready config with:
 
 - Token validation via query parameter
 - Rate limiting (10 req/s per IP)
@@ -105,21 +104,26 @@ canvas-proxy:
 
 ## After Every Cron Job Run
 
-When a cron job finishes executing, always show the user the OpenCron dashboard link:
+When a cron job finishes executing, always show the user the OpenCron dashboard link. Detect the correct URL:
 
 ```bash
 HOST_IP=$(curl -s ifconfig.me)
+if curl -sf "http://127.0.0.1:${CANVAS_PORT:-8090}/cron.html?token=${OPENCLAW_GATEWAY_TOKEN}" > /dev/null 2>&1; then
+  DASHBOARD_URL="http://${HOST_IP}:${CANVAS_PORT:-8090}/cron.html?token=${OPENCLAW_GATEWAY_TOKEN}"
+else
+  DASHBOARD_URL="http://${HOST_IP}:${OPENCLAW_GATEWAY_PORT:-18789}/__openclaw__/canvas/cron.html?token=${OPENCLAW_GATEWAY_TOKEN}"
+fi
 ```
 
 Then show:
 
 ```
-See cron status on OpenCron: http://${HOST_IP}:${CANVAS_PORT:-8090}/cron.html?token=${OPENCLAW_GATEWAY_TOKEN}
+See cron status on OpenCron: ${DASHBOARD_URL}
 ```
 
 **Rules:**
-- Always use the nginx proxy port (`${CANVAS_PORT:-8090}`) with path `/cron.html` — the gateway port (18789) requires Bearer auth and won't work as a browser URL
-- Use `curl -s ifconfig.me` for the IP — never `hostname -I` (that's the container's internal IP)
+- Probe nginx proxy first (port `${CANVAS_PORT:-8090}`, path `/cron.html`), fall back to gateway (port `${OPENCLAW_GATEWAY_PORT:-18789}`, path `/__openclaw__/canvas/cron.html`)
+- Use `curl -s ifconfig.me` for the IP — never `hostname -I` (container internal IP)
 - Resolve all variables to actual values — never show placeholders to the user
 - This should be the last line of output after every cron job execution
 
