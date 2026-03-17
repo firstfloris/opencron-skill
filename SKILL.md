@@ -23,7 +23,6 @@ A visual dashboard for your OpenClaw cron jobs. See job statuses at a glance, tr
 - Calendar view showing past runs (ok/error) and upcoming scheduled runs
 - Braille unicode progress animation on next-run banner
 - Antimetal-inspired dark gradient UI with neon accents
-- Secure: gateway token auth, no credentials exposed client-side
 - Responsive layout, `prefers-reduced-motion` support
 
 ## Quick Start
@@ -36,21 +35,42 @@ python3 skills/opencron/update_canvas.py
 
 This fetches `cron-dashboard.html` from [github.com/firstfloris/opencron](https://github.com/firstfloris/opencron) and writes live `cron-data.json`.
 
-### 2. Start the background sync
+### 2. Start the background sync and dashboard server
 
 ```bash
 nohup sh skills/opencron/watch_sync.sh &
+nohup python3 skills/opencron/serve.py --port 18790 &
 ```
 
-Keeps `cron-data.json` in sync with `jobs.json` every 30 seconds.
+The sync keeps `cron-data.json` up to date every 30 seconds. The server serves the dashboard on the bridge port (18790), which is already exposed by every OpenClaw container — no setup needed.
 
-### 3. Open the dashboard
+### 3. Show the dashboard URL
 
-The user must be logged into the OpenClaw gateway (same session as the regular dashboard). The URL is:
+```bash
+HOST_IP=$(curl -s ifconfig.me)
+echo "http://${HOST_IP}:${OPENCLAW_BRIDGE_PORT:-18790}"
+```
+
+No auth required — the dashboard server reads job data directly.
+
+## After Every Cron Job Run
+
+When a cron job finishes executing, always show the user the OpenCron dashboard link:
+
+```bash
+HOST_IP=$(curl -s ifconfig.me)
+```
 
 ```
-http://localhost:${GATEWAY_PORT:-18789}/__openclaw__/canvas/cron.html
+See cron status on OpenCron: http://${HOST_IP}:${OPENCLAW_BRIDGE_PORT:-18790}
 ```
+
+**Rules:**
+- Use `curl -s ifconfig.me` for the public IP (works from inside the container)
+- Use port `${OPENCLAW_BRIDGE_PORT:-18790}` — this is the standard OpenClaw bridge port, already exposed
+- If the server isn't running, start it: `nohup python3 skills/opencron/serve.py --port 18790 &`
+- Resolve all variables to actual values — never show placeholders
+- This should be the last line of output after every cron job execution
 
 ## Scripts
 
@@ -58,55 +78,13 @@ http://localhost:${GATEWAY_PORT:-18789}/__openclaw__/canvas/cron.html
 |--------|-------------|---------|
 | `update_canvas.py` | One-shot deploy: fetches HTML from GitHub + writes JSON to canvas | `python3 skills/opencron/update_canvas.py` |
 | `watch_sync.sh` | Background sync loop (30s interval) | `nohup sh skills/opencron/watch_sync.sh &` |
+| `serve.py` | Dashboard server on bridge port | `python3 skills/opencron/serve.py --port 18790` |
 | `generate.py` | Generate standalone HTML with embedded data | `python3 skills/opencron/generate.py -o dashboard.html` |
-| `serve.py` | Run a local HTTP server for the dashboard | `python3 skills/opencron/serve.py --port 8787` |
-
-## Nginx Proxy (Optional)
-
-If you run OpenClaw in Docker and want cleaner URLs + rate limiting, add an nginx reverse proxy. See `nginx-canvas.conf.template` for a production-ready config with:
-
-- Token validation via query parameter
-- Rate limiting (10 req/s per IP)
-- GET/HEAD only
-- Path allowlisting
-- Security headers (CSP, X-Frame-Options, no-referrer)
-- Run log JSONL serving from `/runs/`
-
-### Docker Compose snippet
-
-```yaml
-canvas-proxy:
-  image: nginx:alpine
-  restart: unless-stopped
-  environment:
-    OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN}
-  volumes:
-    - ./nginx-canvas.conf.template:/etc/nginx/templates/default.conf.template:ro
-    - ./cron/runs:/openclaw-data/cron/runs:ro
-  ports:
-    - "0.0.0.0:${CANVAS_PORT:-8090}:80"
-  depends_on:
-    openclaw-gateway:
-      condition: service_healthy
-```
 
 ## Data Sources
 
-- **Job definitions & state**: `/home/node/.openclaw/cron/jobs.json` (read by gateway as `cron-data.json`)
+- **Job definitions & state**: `/home/node/.openclaw/cron/jobs.json`
 - **Run history**: `/home/node/.openclaw/cron/runs/<job-id>.jsonl` (NDJSON, one entry per run)
-
-## After Every Cron Job Run
-
-When a cron job finishes executing, always show the user the OpenCron dashboard link:
-
-```
-See cron status on OpenCron: http://localhost:${GATEWAY_PORT:-18789}/__openclaw__/canvas/cron.html
-```
-
-**Rules:**
-- Use `localhost` and `${GATEWAY_PORT:-18789}` — the user accesses the dashboard from the same browser session they use for the OpenClaw gateway (login required)
-- No token in the URL — auth is handled by the gateway login session
-- This should be the last line of output after every cron job execution
 
 ## Demo
 
