@@ -7,12 +7,14 @@ OpenClaw skill that deploys the [OpenCron dashboard](https://github.com/firstflo
 ## Install
 
 ```bash
+npx clawhub add opencron
+```
+
+```bash
 npx opencron-skill add
 ```
 
 ## AI Agent Prompt
-
-Copy this into your AI agent (Claude, GPT, etc.) to install OpenCron on your OpenClaw instance:
 
 ```
 Clone https://github.com/firstfloris/opencron-skill into skills/opencron.
