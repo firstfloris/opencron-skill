@@ -6,21 +6,23 @@ OpenClaw skill that deploys the [OpenCron dashboard](https://github.com/firstflo
 
 ## Install
 
-```bash
-npx clawhub add opencron
-```
-
-```bash
-npx opencron-skill add
-```
-
-## AI Agent Prompt
+Copy this into your OpenClaw:
 
 ```
 Clone https://github.com/firstfloris/opencron-skill into skills/opencron.
 Run python3 skills/opencron/update_canvas.py to deploy the dashboard.
 Run nohup sh skills/opencron/watch_sync.sh & to start background sync.
 After every cron job run, show the user: "See cron status on OpenCron: <dashboard-url>"
+```
+
+Or via CLI:
+
+```bash
+npx clawhub add opencron
+```
+
+```bash
+npx opencron-skill add
 ```
 
 <details>
