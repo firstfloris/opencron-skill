@@ -46,17 +46,10 @@ Keeps `cron-data.json` in sync with `jobs.json` every 30 seconds.
 
 ### 3. Open the dashboard
 
-Detect your setup and build the dashboard URL:
+The user must be logged into the OpenClaw gateway (same session as the regular dashboard). The URL is:
 
-```bash
-HOST_IP=$(curl -s ifconfig.me)
-if curl -sf "http://127.0.0.1:${CANVAS_PORT:-8090}/cron.html?token=${OPENCLAW_GATEWAY_TOKEN}" > /dev/null 2>&1; then
-  # Nginx proxy is running — use short path
-  DASHBOARD_URL="http://${HOST_IP}:${CANVAS_PORT:-8090}/cron.html?token=${OPENCLAW_GATEWAY_TOKEN}"
-else
-  # No proxy — use gateway canvas path directly
-  DASHBOARD_URL="http://${HOST_IP}:${OPENCLAW_GATEWAY_PORT:-18789}/__openclaw__/canvas/cron.html?token=${OPENCLAW_GATEWAY_TOKEN}"
-fi
+```
+http://localhost:${GATEWAY_PORT:-18789}/__openclaw__/canvas/cron.html
 ```
 
 ## Scripts
@@ -104,27 +97,15 @@ canvas-proxy:
 
 ## After Every Cron Job Run
 
-When a cron job finishes executing, always show the user the OpenCron dashboard link. Detect the correct URL:
-
-```bash
-HOST_IP=$(curl -s ifconfig.me)
-if curl -sf "http://127.0.0.1:${CANVAS_PORT:-8090}/cron.html?token=${OPENCLAW_GATEWAY_TOKEN}" > /dev/null 2>&1; then
-  DASHBOARD_URL="http://${HOST_IP}:${CANVAS_PORT:-8090}/cron.html?token=${OPENCLAW_GATEWAY_TOKEN}"
-else
-  DASHBOARD_URL="http://${HOST_IP}:${OPENCLAW_GATEWAY_PORT:-18789}/__openclaw__/canvas/cron.html?token=${OPENCLAW_GATEWAY_TOKEN}"
-fi
-```
-
-Then show:
+When a cron job finishes executing, always show the user the OpenCron dashboard link:
 
 ```
-See cron status on OpenCron: ${DASHBOARD_URL}
+See cron status on OpenCron: http://localhost:${GATEWAY_PORT:-18789}/__openclaw__/canvas/cron.html
 ```
 
 **Rules:**
-- Probe nginx proxy first (port `${CANVAS_PORT:-8090}`, path `/cron.html`), fall back to gateway (port `${OPENCLAW_GATEWAY_PORT:-18789}`, path `/__openclaw__/canvas/cron.html`)
-- Use `curl -s ifconfig.me` for the IP — never `hostname -I` (container internal IP)
-- Resolve all variables to actual values — never show placeholders to the user
+- Use `localhost` and `${GATEWAY_PORT:-18789}` — the user accesses the dashboard from the same browser session they use for the OpenClaw gateway (login required)
+- No token in the URL — auth is handled by the gateway login session
 - This should be the last line of output after every cron job execution
 
 ## Demo
