@@ -1,9 +1,9 @@
 #!/bin/sh
-# Sync jobs.json to canvas/cron-data.json every 30 seconds.
+# Regenerate the embedded dashboard HTML every 30 seconds.
+# This re-reads jobs.json and run history and writes fresh HTML.
 # Run as: nohup sh skills/opencron/watch_sync.sh &
-JOBS="$HOME/.openclaw/cron/jobs.json"
-DEST="$HOME/.openclaw/canvas/cron-data.json"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 while true; do
-    cp "$JOBS" "$DEST" 2>/dev/null
+    python3 "$SCRIPT_DIR/update_canvas.py" --sync 2>/dev/null
     sleep 30
 done
