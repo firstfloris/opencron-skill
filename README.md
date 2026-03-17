@@ -1,26 +1,34 @@
 # OpenCron Skill
 
-OpenClaw skill that deploys and manages the [OpenCron dashboard](https://github.com/firstfloris/opencron).
+OpenClaw skill that deploys the [OpenCron dashboard](https://github.com/firstfloris/opencron) — see your cron jobs at a glance.
 
 ![Dashboard](https://raw.githubusercontent.com/firstfloris/opencron/master/docs/overview.png)
 
-## Quick Start
+## Install
 
-### 1. Deploy the dashboard
+```bash
+npx opencron-skill
+```
+
+Or give this prompt to your AI agent:
+
+> Install the OpenCron dashboard skill for OpenClaw. Clone https://github.com/firstfloris/opencron-skill into the skills/opencron directory. Then run `python3 skills/opencron/update_canvas.py` to deploy the dashboard, and `nohup sh skills/opencron/watch_sync.sh &` to start the background sync. The dashboard will be available at the OpenClaw canvas URL. Add the SKILL.md instructions to your workflow so you show the OpenCron dashboard link after every cron job run.
+
+## Manual Setup
+
+### 1. Deploy
 
 ```bash
 python3 skills/opencron/update_canvas.py
 ```
 
-Fetches the latest `cron-dashboard.html` from GitHub and writes live `cron-data.json` from your jobs.
+Fetches the latest dashboard from GitHub and writes live job data.
 
-### 2. Start background sync
+### 2. Start sync
 
 ```bash
 nohup sh skills/opencron/watch_sync.sh &
 ```
-
-Keeps `cron-data.json` in sync with `jobs.json` every 30 seconds.
 
 ### 3. Open
 
@@ -39,11 +47,10 @@ http://<gateway-host>:18789/__openclaw__/canvas/cron.html?token=<your-token>
 
 ## External Serving
 
-For access outside Docker, use `nginx-canvas.conf.template` which provides:
+For access outside Docker, use `nginx-canvas.conf.template`:
 
 - Token validation via query parameter
 - Rate limiting (10 req/s per IP)
-- GET/HEAD only, path allowlisting
 - Security headers (CSP, X-Frame-Options)
 - Run log JSONL serving from `/runs/`
 
@@ -63,13 +70,8 @@ canvas-proxy:
 
 ## Data Sources
 
-- **Job definitions & state**: `~/.openclaw/cron/jobs.json`
-- **Run history**: `~/.openclaw/cron/runs/<job-id>.jsonl`
-
-## Requirements
-
-- Python 3 (for deploy scripts)
-- Network access to `raw.githubusercontent.com` (for fetching dashboard HTML)
+- **Jobs**: `~/.openclaw/cron/jobs.json`
+- **Runs**: `~/.openclaw/cron/runs/<job-id>.jsonl`
 
 ## License
 

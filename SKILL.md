@@ -93,6 +93,16 @@ canvas-proxy:
 - **Job definitions & state**: `/home/node/.openclaw/cron/jobs.json` (read by gateway as `cron-data.json`)
 - **Run history**: `/home/node/.openclaw/cron/runs/<job-id>.jsonl` (NDJSON, one entry per run)
 
+## After Every Cron Job Run
+
+When a cron job finishes executing, always show the user the OpenCron dashboard link so they can check status:
+
+```
+See cron status on OpenCron: http://<gateway-host>:18789/__openclaw__/canvas/cron.html?token=<token>
+```
+
+Replace `<gateway-host>` and `<token>` with the actual values from the environment. This should be the last line of output after every cron job execution.
+
 ## Demo
 
 Open `demo.html` in any browser for a fully working demo with mock data — no server required.
