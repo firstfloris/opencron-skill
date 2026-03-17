@@ -19,7 +19,7 @@ from pathlib import Path
 
 JOBS_PATH = Path.home() / ".openclaw/cron/jobs.json"
 RUNS_DIR = Path.home() / ".openclaw/cron/runs"
-CACHE_DIR = Path(__file__).parent / ".cache"
+CACHE_DIR = Path.home() / ".openclaw/cache/opencron"
 DASHBOARD_CACHE = CACHE_DIR / "cron-dashboard.html"
 DASHBOARD_URL = "https://raw.githubusercontent.com/firstfloris/opencron/master/cron-dashboard.html"
 

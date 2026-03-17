@@ -1,23 +1,29 @@
 #!/usr/bin/env python3
-"""Deploy the OpenCron dashboard with embedded data.
+"""Deploy the OpenCron dashboard on the gateway port.
 
-Fetches the dashboard HTML from GitHub, reads job data and run history
-from disk, injects them inline, and writes to the gateway's static UI
-directory so it's served at /cron.html on the same port as OpenClaw.
+Copies the gateway's control-UI assets to a writable directory, adds
+cron.html with embedded job data, and points the gateway config at the
+new root.  The gateway auto-restarts on config change, so cron.html
+becomes available at http://host:18789/cron.html — same port as the
+OpenClaw dashboard, no extra auth.
 
 Usage:
-    python3 skills/opencron/update_canvas.py
+    python3 skills/opencron/update_canvas.py          # first-time setup + deploy
+    python3 skills/opencron/update_canvas.py --sync   # refresh data only
 """
 
 import json
+import os
+import shutil
 import urllib.request
 from pathlib import Path
 
 JOBS_PATH = Path.home() / ".openclaw/cron/jobs.json"
 RUNS_DIR = Path.home() / ".openclaw/cron/runs"
-CANVAS_DIR = Path.home() / ".openclaw/canvas"
-UI_DIR = Path("/app/dist/control-ui")
-CACHE_DIR = Path(__file__).parent / ".cache"
+CONFIG_PATH = Path.home() / ".openclaw/openclaw.json"
+UI_OVERLAY = Path.home() / ".openclaw/ui"
+BUNDLED_UI = Path("/app/dist/control-ui")
+CACHE_DIR = Path.home() / ".openclaw/cache/opencron"
 DASHBOARD_CACHE = CACHE_DIR / "cron-dashboard.html"
 DASHBOARD_URL = "https://raw.githubusercontent.com/firstfloris/opencron/master/cron-dashboard.html"
 
@@ -63,30 +69,117 @@ def read_runs(jobs):
     return runs
 
 
+def build_data_js(jobs=None, runs=None):
+    """Build a JS file that sets window globals for job data."""
+    if jobs is None:
+        jobs = read_jobs()
+    if runs is None:
+        runs = read_runs(jobs)
+    return (
+        "window.__OPENCRON_DATA=" + json.dumps(jobs) + ";\n"
+        "window.__OPENCRON_RUNS=" + json.dumps(runs) + ";\n"
+    )
+
+
+def externalize_scripts(html):
+    """Extract inline <script> content to an external file.
+
+    The gateway's control-UI sets a strict CSP (script-src 'self') that
+    blocks inline scripts.  This moves all inline JS to opencron-app.js
+    and replaces <script>...</script> with <script src="opencron-app.js">.
+    Also removes inline event handlers (onload, onclick) since CSP blocks
+    those too.
+    """
+    import re
+
+    app_js_parts = []
+
+    def replace_inline_script(m):
+        content = m.group(1).strip()
+        if content:
+            app_js_parts.append(content)
+        return ""
+
+    html = re.sub(
+        r"<script(?:\s[^>]*)?>(.+?)</script>",
+        replace_inline_script,
+        html,
+        flags=re.DOTALL,
+    )
+
+    # Remove inline event handlers (onload="...", onclick="...")
+    html = re.sub(r'\s+onload="[^"]*"', "", html)
+    html = re.sub(r"\s+onload='[^']*'", "", html)
+
+    app_js = "\n".join(app_js_parts)
+    return html, app_js
+
+
 def build_page(template=None):
-    """Build complete HTML with embedded data."""
+    """Build HTML + external JS files for CSP-safe serving."""
     if template is None:
         template = get_template()
-    jobs = read_jobs()
-    runs = read_runs(jobs)
 
-    inject = (
-        "<script>"
-        "window.__OPENCRON_DATA=" + json.dumps(jobs) + ";"
-        "window.__OPENCRON_RUNS=" + json.dumps(runs) + ";"
-        "</script>"
+    html, app_js = externalize_scripts(template)
+
+    # Add external script tags before </body>
+    scripts = (
+        '<script src="opencron-data.js"></script>\n'
+        '<script src="opencron-app.js"></script>\n'
     )
-    return template.replace("</head>", inject + "</head>")
+    html = html.replace("</body>", scripts + "</body>")
+
+    return html, app_js
 
 
-def deploy(html):
-    """Write HTML to gateway UI dir and canvas dir."""
-    if UI_DIR.exists():
-        (UI_DIR / "cron.html").write_text(html, encoding="utf-8")
+def ensure_ui_overlay():
+    """Copy bundled control-UI to a writable overlay directory.
 
-    CANVAS_DIR.mkdir(parents=True, exist_ok=True)
-    (CANVAS_DIR / "cron.html").write_text(html, encoding="utf-8")
-    (CANVAS_DIR / "cron-data.json").write_text(json.dumps(read_jobs()))
+    Returns True if the overlay was just created (config needs updating).
+    """
+    if UI_OVERLAY.exists() and (UI_OVERLAY / "index.html").exists():
+        return False
+
+    if not BUNDLED_UI.exists():
+        print("Warning: bundled control-UI not found, creating minimal overlay")
+        UI_OVERLAY.mkdir(parents=True, exist_ok=True)
+        return True
+
+    # Copy bundled UI to writable location
+    if UI_OVERLAY.exists():
+        shutil.rmtree(UI_OVERLAY)
+    shutil.copytree(str(BUNDLED_UI), str(UI_OVERLAY), ignore=shutil.ignore_patterns("cron*"))
+    return True
+
+
+def update_gateway_config():
+    """Point gateway.controlUi.root at the overlay directory.
+
+    The gateway watches openclaw.json and auto-restarts on changes to
+    the gateway.* section, so this takes effect without manual restart.
+    """
+    try:
+        config = json.loads(CONFIG_PATH.read_text())
+    except Exception:
+        config = {}
+
+    gw = config.setdefault("gateway", {})
+    cui = gw.setdefault("controlUi", {})
+
+    if cui.get("root") == str(UI_OVERLAY):
+        return False  # already set
+
+    cui["root"] = str(UI_OVERLAY)
+    CONFIG_PATH.write_text(json.dumps(config, indent=2))
+    return True
+
+
+def deploy(html, app_js, data_js):
+    """Write cron.html and JS files to the UI overlay."""
+    UI_OVERLAY.mkdir(parents=True, exist_ok=True)
+    (UI_OVERLAY / "cron.html").write_text(html, encoding="utf-8")
+    (UI_OVERLAY / "opencron-app.js").write_text(app_js, encoding="utf-8")
+    (UI_OVERLAY / "opencron-data.js").write_text(data_js, encoding="utf-8")
 
 
 def main():
@@ -94,14 +187,32 @@ def main():
     sync = "--sync" in sys.argv
 
     if sync:
-        # Quick refresh: re-read data, use cached template
-        deploy(build_page())
-    else:
-        # Full deploy: fetch latest HTML from GitHub
-        print(f"Fetching dashboard from {DASHBOARD_URL}...")
-        template = fetch_template()
-        deploy(build_page(template))
-        print(f"Dashboard deployed to /cron.html")
+        jobs = read_jobs()
+        runs = read_runs(jobs)
+        # Only update data JS on sync (app JS doesn't change)
+        UI_OVERLAY.mkdir(parents=True, exist_ok=True)
+        (UI_OVERLAY / "opencron-data.js").write_text(
+            build_data_js(jobs, runs), encoding="utf-8"
+        )
+        return
+
+    # Full deploy
+    print(f"Fetching dashboard from {DASHBOARD_URL}...")
+    template = fetch_template()
+    jobs = read_jobs()
+    runs = read_runs(jobs)
+    html, app_js = build_page(template)
+    data_js = build_data_js(jobs, runs)
+
+    created = ensure_ui_overlay()
+    deploy(html, app_js, data_js)
+
+    if created:
+        changed = update_gateway_config()
+        if changed:
+            print("Gateway config updated — gateway will auto-restart")
+
+    print("Dashboard deployed to /cron.html")
 
 
 if __name__ == "__main__":

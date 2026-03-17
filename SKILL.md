@@ -1,7 +1,7 @@
 ---
 name: opencron
 description: Visual cron job dashboard for OpenClaw — live countdown timers, run history, calendar view
-version: 1.2.0
+version: 1.3.0
 metadata:
   openclaw:
     emoji: "\u26A1"
@@ -15,44 +15,57 @@ A visual dashboard for your OpenClaw cron jobs.
 
 ## Setup
 
-### 1. Start the dashboard server
+### 1. Deploy the dashboard
 
 ```bash
-nohup python3 skills/opencron/serve.py --port 18790 &
+python3 skills/opencron/update_canvas.py
 ```
 
-Fetches the dashboard HTML from GitHub, reads live job data and run history from disk, and serves a complete page with data embedded — no client-side fetch, no auth.
+On first run this:
+- Fetches dashboard HTML from GitHub
+- Copies the gateway control-UI to a writable directory
+- Embeds live job data and run history into the HTML
+- Points the gateway config at the new directory (triggers auto-restart)
 
-Port 18790 (bridge port) is already exposed by every OpenClaw container.
+After the gateway restarts (~5s), the dashboard is available on the same port as OpenClaw.
 
-### 2. Dashboard URL
+### 2. Start background sync
+
+```bash
+nohup sh skills/opencron/watch_sync.sh &
+```
+
+Re-embeds fresh data every 30 seconds.
+
+### 3. Dashboard URL
 
 ```
-http://localhost:18790/cron.html
+http://localhost:${GATEWAY_PORT:-18789}/cron.html
 ```
 
-The server re-reads job data on every page load, so the dashboard is always up to date.
+Same port as the OpenClaw dashboard — no extra setup, no extra auth.
 
 ## After Every Cron Job Run
 
 Always show the user the dashboard link after a cron job finishes:
 
 ```
-See cron status on OpenCron: http://localhost:18790/cron.html
+See cron status on OpenCron: http://localhost:${GATEWAY_PORT:-18789}/cron.html
 ```
 
 **Rules:**
-- If the server isn't running, start it: `nohup python3 skills/opencron/serve.py --port 18790 &`
+- Same URL as the OpenClaw dashboard, just `/cron.html` instead of `/`
+- If sync isn't running, start it: `nohup sh skills/opencron/watch_sync.sh &`
 - This should be the last line of output after every cron job execution
 
 ## Scripts
 
 | Script | What it does |
 |--------|-------------|
-| `serve.py` | Dashboard server — embeds fresh data on every request |
-| `update_canvas.py` | Fetch HTML from GitHub, embed data, deploy to gateway static dir |
+| `update_canvas.py` | Deploy dashboard to gateway port (first-time setup + data embed) |
 | `update_canvas.py --sync` | Re-embed fresh data (used by watch_sync.sh) |
 | `watch_sync.sh` | Background loop: re-embeds data every 30s |
+| `serve.py` | Standalone server (fallback, uses bridge port 18790) |
 | `generate.py` | Generate standalone HTML file with embedded data |
 
 ## Data Sources
