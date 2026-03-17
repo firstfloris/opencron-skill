@@ -46,26 +46,19 @@ Keeps `cron-data.json` in sync with `jobs.json` every 30 seconds.
 
 ### 3. Open the dashboard
 
-Get the public IP and detect which port the dashboard is on:
+The dashboard is served via the nginx proxy on port `${CANVAS_PORT:-8090}`. Get the public IP:
 
 ```bash
 HOST_IP=$(curl -s ifconfig.me)
-CRON_PORT=${CANVAS_PORT:-8090}
-if curl -sf "http://127.0.0.1:${CRON_PORT}/cron.html?token=${OPENCLAW_GATEWAY_TOKEN}" > /dev/null 2>&1; then
-  CRON_PATH="/cron.html"
-else
-  CRON_PORT=18789
-  CRON_PATH="/__openclaw__/canvas/cron.html"
-fi
 ```
 
 Dashboard URL:
 
 ```
-http://${HOST_IP}:${CRON_PORT}${CRON_PATH}?token=${OPENCLAW_GATEWAY_TOKEN}
+http://${HOST_IP}:${CANVAS_PORT:-8090}/cron.html?token=${OPENCLAW_GATEWAY_TOKEN}
 ```
 
-**Important:** Never use `hostname -I` — that returns the container's internal IP which is unreachable from outside.
+**Important:** The gateway port (18789) requires Bearer auth and cannot be used as a browser URL. Always use the nginx proxy port.
 
 ## Scripts
 
@@ -99,7 +92,7 @@ canvas-proxy:
     - ./nginx-canvas.conf.template:/etc/nginx/templates/default.conf.template:ro
     - ./cron/runs:/openclaw-data/cron/runs:ro
   ports:
-    - "127.0.0.1:${CANVAS_PORT:-8090}:80"
+    - "0.0.0.0:${CANVAS_PORT:-8090}:80"
   depends_on:
     openclaw-gateway:
       condition: service_healthy
@@ -112,27 +105,20 @@ canvas-proxy:
 
 ## After Every Cron Job Run
 
-When a cron job finishes executing, always show the user the OpenCron dashboard link. Detect the correct port and public IP:
+When a cron job finishes executing, always show the user the OpenCron dashboard link:
 
 ```bash
 HOST_IP=$(curl -s ifconfig.me)
-CRON_PORT=${CANVAS_PORT:-8090}
-if curl -sf "http://127.0.0.1:${CRON_PORT}/cron.html?token=${OPENCLAW_GATEWAY_TOKEN}" > /dev/null 2>&1; then
-  CRON_PATH="/cron.html"
-else
-  CRON_PORT=18789
-  CRON_PATH="/__openclaw__/canvas/cron.html"
-fi
 ```
 
 Then show:
 
 ```
-See cron status on OpenCron: http://${HOST_IP}:${CRON_PORT}${CRON_PATH}?token=${OPENCLAW_GATEWAY_TOKEN}
+See cron status on OpenCron: http://${HOST_IP}:${CANVAS_PORT:-8090}/cron.html?token=${OPENCLAW_GATEWAY_TOKEN}
 ```
 
 **Rules:**
-- Try nginx proxy first (port 8090, path `/cron.html`), fall back to gateway (port 18789, path `/__openclaw__/canvas/cron.html`)
+- Always use the nginx proxy port (`${CANVAS_PORT:-8090}`) with path `/cron.html` — the gateway port (18789) requires Bearer auth and won't work as a browser URL
 - Use `curl -s ifconfig.me` for the IP — never `hostname -I` (that's the container's internal IP)
 - Resolve all variables to actual values — never show placeholders to the user
 - This should be the last line of output after every cron job execution

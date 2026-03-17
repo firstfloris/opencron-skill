@@ -77,7 +77,7 @@ canvas-proxy:
     - ./nginx-canvas.conf.template:/etc/nginx/templates/default.conf.template:ro
     - ./cron/runs:/openclaw-data/cron/runs:ro
   ports:
-    - "127.0.0.1:${CANVAS_PORT:-8090}:80"
+    - "0.0.0.0:${CANVAS_PORT:-8090}:80"
 ```
 
 ### Data Sources
