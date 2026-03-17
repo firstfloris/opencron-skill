@@ -46,8 +46,11 @@ Keeps `cron-data.json` in sync with `jobs.json` every 30 seconds.
 
 ### 3. Open the dashboard
 
-```
-http://<gateway-host>:18789/__openclaw__/canvas/cron.html
+Detect the host IP and build the dashboard URL:
+
+```bash
+HOST_IP=$(hostname -I 2>/dev/null | awk '{print $1}' || ipconfig getifaddr en0 2>/dev/null || echo "127.0.0.1")
+echo "http://${HOST_IP}:${CANVAS_PORT:-8090}/cron.html?token=${OPENCLAW_GATEWAY_TOKEN}"
 ```
 
 ## Scripts
@@ -95,13 +98,19 @@ canvas-proxy:
 
 ## After Every Cron Job Run
 
-When a cron job finishes executing, always show the user the OpenCron dashboard link so they can check status:
+When a cron job finishes executing, always show the user the OpenCron dashboard link so they can check status. Detect the host IP automatically:
+
+```bash
+HOST_IP=$(hostname -I 2>/dev/null | awk '{print $1}' || ipconfig getifaddr en0 2>/dev/null || echo "127.0.0.1")
+```
+
+Then show:
 
 ```
-See cron status on OpenCron: http://<gateway-host>:18789/__openclaw__/canvas/cron.html?token=<token>
+See cron status on OpenCron: http://${HOST_IP}:${CANVAS_PORT:-8090}/cron.html?token=${OPENCLAW_GATEWAY_TOKEN}
 ```
 
-Replace `<gateway-host>` and `<token>` with the actual values from the environment. This should be the last line of output after every cron job execution.
+Use the actual resolved IP and token values — never show placeholders to the user. This should be the last line of output after every cron job execution.
 
 ## Demo
 
