@@ -44,11 +44,8 @@ nohup sh skills/opencron/watch_sync.sh &
 
 ### 3. Open
 
-Detect your host IP and open the dashboard:
-
 ```bash
-HOST_IP=$(hostname -I 2>/dev/null | awk '{print $1}' || ipconfig getifaddr en0 2>/dev/null || echo "127.0.0.1")
-open "http://${HOST_IP}:${CANVAS_PORT:-8090}/cron.html?token=${OPENCLAW_GATEWAY_TOKEN}"
+open "http://$(curl -s ifconfig.me):${CANVAS_PORT:-8090}/cron.html?token=${OPENCLAW_GATEWAY_TOKEN}"
 ```
 
 ### Scripts

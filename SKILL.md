@@ -46,12 +46,21 @@ Keeps `cron-data.json` in sync with `jobs.json` every 30 seconds.
 
 ### 3. Open the dashboard
 
-Detect the host IP and build the dashboard URL:
+The dashboard is served via the nginx proxy on port `${CANVAS_PORT:-8090}` — NOT the gateway port.
+
+Get the server's **public** IP (not the container's internal IP):
 
 ```bash
-HOST_IP=$(hostname -I 2>/dev/null | awk '{print $1}' || ipconfig getifaddr en0 2>/dev/null || echo "127.0.0.1")
-echo "http://${HOST_IP}:${CANVAS_PORT:-8090}/cron.html?token=${OPENCLAW_GATEWAY_TOKEN}"
+HOST_IP=$(curl -s ifconfig.me)
 ```
+
+Dashboard URL:
+
+```
+http://${HOST_IP}:${CANVAS_PORT:-8090}/cron.html?token=${OPENCLAW_GATEWAY_TOKEN}
+```
+
+**Important:** Never use `hostname -I` — that returns the container's internal IP which is unreachable from outside.
 
 ## Scripts
 
@@ -98,10 +107,10 @@ canvas-proxy:
 
 ## After Every Cron Job Run
 
-When a cron job finishes executing, always show the user the OpenCron dashboard link so they can check status. Detect the host IP automatically:
+When a cron job finishes executing, always show the user the OpenCron dashboard link. Get the **public** IP via:
 
 ```bash
-HOST_IP=$(hostname -I 2>/dev/null | awk '{print $1}' || ipconfig getifaddr en0 2>/dev/null || echo "127.0.0.1")
+HOST_IP=$(curl -s ifconfig.me)
 ```
 
 Then show:
@@ -110,7 +119,11 @@ Then show:
 See cron status on OpenCron: http://${HOST_IP}:${CANVAS_PORT:-8090}/cron.html?token=${OPENCLAW_GATEWAY_TOKEN}
 ```
 
-Use the actual resolved IP and token values — never show placeholders to the user. This should be the last line of output after every cron job execution.
+**Rules:**
+- Use port `${CANVAS_PORT:-8090}` (nginx proxy) — never the gateway port (18789)
+- Use `curl -s ifconfig.me` for the IP — never `hostname -I` (that's the container's internal IP)
+- Resolve all variables to actual values — never show placeholders to the user
+- This should be the last line of output after every cron job execution
 
 ## Demo
 
