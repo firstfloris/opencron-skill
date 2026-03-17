@@ -1,20 +1,28 @@
 # OpenCron Skill
 
-OpenClaw skill that deploys the [OpenCron dashboard](https://github.com/firstfloris/opencron) — see your cron jobs at a glance.
+OpenClaw skill that deploys the [OpenCron dashboard](https://github.com/firstfloris/opencron).
 
 ![Dashboard](https://raw.githubusercontent.com/firstfloris/opencron/master/docs/overview.png)
 
 ## Install
 
 ```bash
-npx opencron-skill
+npx opencron-skill add
 ```
 
-Or give this prompt to your AI agent:
+## AI Agent Prompt
 
-> Install the OpenCron dashboard skill for OpenClaw. Clone https://github.com/firstfloris/opencron-skill into the skills/opencron directory. Then run `python3 skills/opencron/update_canvas.py` to deploy the dashboard, and `nohup sh skills/opencron/watch_sync.sh &` to start the background sync. The dashboard will be available at the OpenClaw canvas URL. Add the SKILL.md instructions to your workflow so you show the OpenCron dashboard link after every cron job run.
+Copy this into your AI agent (Claude, GPT, etc.) to install OpenCron on your OpenClaw instance:
 
-## Manual Setup
+```
+Clone https://github.com/firstfloris/opencron-skill into skills/opencron.
+Run python3 skills/opencron/update_canvas.py to deploy the dashboard.
+Run nohup sh skills/opencron/watch_sync.sh & to start background sync.
+After every cron job run, show the user: "See cron status on OpenCron: <dashboard-url>"
+```
+
+<details>
+<summary>Manual setup</summary>
 
 ### 1. Deploy
 
@@ -36,7 +44,7 @@ nohup sh skills/opencron/watch_sync.sh &
 http://<gateway-host>:18789/__openclaw__/canvas/cron.html?token=<your-token>
 ```
 
-## Scripts
+### Scripts
 
 | Script | Purpose |
 |--------|---------|
@@ -45,7 +53,7 @@ http://<gateway-host>:18789/__openclaw__/canvas/cron.html?token=<your-token>
 | `generate.py` | Generate standalone HTML with embedded data |
 | `serve.py` | Local HTTP server for development |
 
-## External Serving
+### External Serving
 
 For access outside Docker, use `nginx-canvas.conf.template`:
 
@@ -68,10 +76,12 @@ canvas-proxy:
     - "127.0.0.1:${CANVAS_PORT:-8090}:80"
 ```
 
-## Data Sources
+### Data Sources
 
 - **Jobs**: `~/.openclaw/cron/jobs.json`
 - **Runs**: `~/.openclaw/cron/runs/<job-id>.jsonl`
+
+</details>
 
 ## License
 
