@@ -1,6 +1,6 @@
 #!/bin/sh
-# Regenerate the embedded dashboard HTML every 30 seconds.
-# This re-reads jobs.json and run history and writes fresh HTML.
+# Refresh cron data every 30 seconds.
+# Re-reads jobs.json and run history, writes opencron-data.json to canvas dir.
 # Run as: nohup sh skills/opencron/watch_sync.sh &
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 while true; do
